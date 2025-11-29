@@ -128,8 +128,8 @@ async def search(ctx, keyword: str):
     await ctx.send(embed=embed)
 
 # ---------------- HELP ----------------
-@bot.command(name="help")
-async def help_cmd(ctx):
+@bot.command(name="commands")
+async def commands_cmd(ctx):
     embed = discord.Embed(title="Echo Command List", color=0x77bbff)
     embed.add_field(name="Echo/register \"Name\" Trigger:", value="Register a new character (attach image for avatar)", inline=False)
     embed.add_field(name="Echo/rename Old New", value="Rename a character", inline=False)
@@ -138,6 +138,7 @@ async def help_cmd(ctx):
     embed.add_field(name="Echo/list", value="List your characters", inline=False)
     embed.add_field(name="Echo/search keyword", value="Search characters", inline=False)
     embed.add_field(name="Echo/delete Name", value="Delete a character", inline=False)
+    embed.add_field(name="Echo/commands", value="Show this command list", inline=False)
     await ctx.send(embed=embed)
 
 # ---------------- PROXYING ----------------
