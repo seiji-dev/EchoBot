@@ -1,177 +1,172 @@
 import discord
 from discord.ext import commands
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Echo: A lightweight proxy bot for RP servers
-# Trigger style: PREFIX ONLY, ending with a colon.
-# Example: Idh: Hello there
-# Registered via: Echo/register "Idhren" Idh:
-
+# ---------- BOT SETUP ----------
 intents = discord.Intents.default()
-intents.message_content = True
+intents.messages = True
+bot = commands.Bot(command_prefix="Echo/", intents=intents, help_command=None)  # Disable default help
 
-bot = commands.Bot(command_prefix="Echo/", intents=intents)
-
-# Data structure:
-# characters = {
-#     user_id: {
-#         "Name": {"trigger": "Idh:", "avatar": url}
-#     }
-# }
+# ---------- PERSISTENT STORAGE ----------
+CHAR_FILE = "characters.json"
 characters = {}
 
-@bot.event
-async def on_ready():
-    print(f"Echo online as {bot.user}")
+# Load characters, handle empty or invalid JSON
+if os.path.exists(CHAR_FILE):
+    try:
+        with open(CHAR_FILE, "r") as f:
+            characters = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        characters = {}
+else:
+    characters = {}
 
-# ---------------- REGISTER ----------------
+def save_characters():
+    with open(CHAR_FILE, "w") as f:
+        json.dump(characters, f, indent=4)
+
+# ---------- HELP COMMAND ----------
+@bot.command(name="help")
+async def help_command(ctx):
+    embed = discord.Embed(title="Echo Bot Commands", color=0x00ff00)
+    embed.add_field(name='Echo/register "Name" Bracket:Text [Universe]', value='Register a new character', inline=False)
+    embed.add_field(name='Echo/rename "Old Name" "New Name"', value='Rename a character', inline=False)
+    embed.add_field(name='Echo/avatar "Name" + attach image', value='Update character avatar', inline=False)
+    embed.add_field(name='Echo/list [search term]', value='List characters, optional search', inline=False)
+    embed.add_field(name='Echo/delete "Name"', value='Delete a character', inline=False)
+    embed.add_field(name='Echo/help', value='Show this help message', inline=False)
+    await ctx.send(embed=embed)
+
+# ---------- REGISTER ----------
 @bot.command(name="register")
-async def register(ctx, name: str, trigger: str):
-    if not trigger.endswith(":"):
-        return await ctx.send("Trigger must end with a colon, e.g. Idh:")
+async def register(ctx, name, bracket_text, universe="Default"):
+    user_id = str(ctx.author.id)
 
-    attachment = ctx.message.attachments[0] if ctx.message.attachments else None
-    avatar_url = attachment.url if attachment else ctx.author.display_avatar.url
+    if user_id not in characters:
+        characters[user_id] = []
 
-    user = ctx.author.id
-    characters.setdefault(user, {})
-    characters[user][name] = {"trigger": trigger, "avatar": avatar_url}
-
-    embed = discord.Embed(title="Character Registered", color=0x88ccff)
-    embed.add_field(name="Name", value=name, inline=False)
-    embed.add_field(name="Trigger", value=trigger, inline=False)
-    embed.set_thumbnail(url=avatar_url)
-
-    await ctx.send(embed=embed)
-
-# ---------------- RENAME ----------------
-@bot.command(name="rename")
-async def rename(ctx, old: str, new: str):
-    user = ctx.author.id
-    if old not in characters.get(user, {}):
-        return await ctx.send("Character not found.")
-
-    characters[user][new] = characters[user].pop(old)
-    await ctx.send(f"Renamed **{old}** to **{new}**.")
-
-# ---------------- AVATAR ----------------
-@bot.command(name="avatar")
-async def avatar(ctx, name: str):
-    user = ctx.author.id
-    if name not in characters.get(user, {}):
-        return await ctx.send("Character not found.")
-
-    attachment = ctx.message.attachments[0] if ctx.message.attachments else None
-    if not attachment:
-        return await ctx.send("Please attach an image.")
-
-    characters[user][name]["avatar"] = attachment.url
-    await ctx.send(f"Updated avatar for **{name}**.")
-
-# ---------------- BRACKET / TRIGGER CHANGE ----------------
-@bot.command(name="bracket")
-async def bracket(ctx, name: str, new_trigger: str):
-    if not new_trigger.endswith(":"):
-        return await ctx.send("Trigger must end with a colon.")
-
-    user = ctx.author.id
-    if name not in characters.get(user, {}):
-        return await ctx.send("Character not found.")
-
-    characters[user][name]["trigger"] = new_trigger
-    await ctx.send(f"Updated trigger for **{name}** to `{new_trigger}`.")
-
-# ---------------- DELETE ----------------
-@bot.command(name="delete")
-async def delete(ctx, name: str):
-    user = ctx.author.id
-    if name not in characters.get(user, {}):
-        return await ctx.send("Character not found.")
-
-    del characters[user][name]
-    await ctx.send(f"Deleted **{name}**.")
-
-# ---------------- LIST ----------------
-@bot.command(name="list")
-async def list_characters(ctx):
-    user = ctx.author.id
-    chars = characters.get(user, {})
-
-    if not chars:
-        return await ctx.send("You have no registered characters.")
-
-    embed = discord.Embed(title="Your Characters", color=0x99ddff)
-    for name, data in chars.items():
-        embed.add_field(name=name, value=f"Trigger: `{data['trigger']}`", inline=False)
-    await ctx.send(embed=embed)
-
-# ---------------- SEARCH ----------------
-@bot.command(name="search")
-async def search(ctx, keyword: str):
-    user = ctx.author.id
-    matches = []
-
-    for name, data in characters.get(user, {}).items():
-        if keyword.lower() in name.lower() or keyword.lower() in data["trigger"].lower():
-            matches.append((name, data["trigger"]))
-
-    if not matches:
-        return await ctx.send("No matches found.")
-
-    embed = discord.Embed(title=f"Search results for '{keyword}'", color=0xaaddff)
-    for name, trig in matches:
-        embed.add_field(name=name, value=f"Trigger: `{trig}`", inline=False)
-    await ctx.send(embed=embed)
-
-# ---------------- HELP ----------------
-@bot.command(name="commands")
-async def commands_cmd(ctx):
-    embed = discord.Embed(title="Echo Command List", color=0x77bbff)
-    embed.add_field(name="Echo/register \"Name\" Trigger:", value="Register a new character (attach image for avatar)", inline=False)
-    embed.add_field(name="Echo/rename Old New", value="Rename a character", inline=False)
-    embed.add_field(name="Echo/avatar Name", value="Update avatar (attach image)", inline=False)
-    embed.add_field(name="Echo/bracket Name NewTrigger:", value="Change trigger (must end with colon)", inline=False)
-    embed.add_field(name="Echo/list", value="List your characters", inline=False)
-    embed.add_field(name="Echo/search keyword", value="Search characters", inline=False)
-    embed.add_field(name="Echo/delete Name", value="Delete a character", inline=False)
-    embed.add_field(name="Echo/commands", value="Show this command list", inline=False)
-    await ctx.send(embed=embed)
-
-# ---------------- PROXYING ----------------
-@bot.event
-async def on_message(message):
-    if message.author.bot:
+    # Check duplicates
+    if any(c["name"] == name and c.get("universe") == universe for c in characters[user_id]):
+        await ctx.send(f"A character named `{name}` in universe `{universe}` already exists.")
         return
 
-    user_chars = characters.get(message.author.id, {})
-    content = message.content
+    # Store user input in variable
+    char_data = {
+        "name": name,
+        "bracket": bracket_text,
+        "universe": universe,
+        "avatar": None
+    }
 
-    for name, data in user_chars.items():
-        trigger = data["trigger"]
+    # Add avatar if attached
+    if ctx.message.attachments:
+        char_data["avatar"] = ctx.message.attachments[0].url
 
-        if content.startswith(trigger):
-            proxied = content[len(trigger):].strip()
+    # Add character to user
+    characters[user_id].append(char_data)
+    save_characters()
 
-            webhook = None
-            for wh in await message.channel.webhooks():
-                if wh.name == "EchoProxy":
-                    webhook = wh
-                    break
-            if webhook is None:
-                webhook = await message.channel.create_webhook(name="EchoProxy")
+    # Send confirmation embed
+    embed = discord.Embed(title=f"Character Registered: {name}", color=0x00ff00)
+    embed.add_field(name="Bracket", value=bracket_text, inline=False)
+    embed.add_field(name="Universe", value=universe, inline=False)
+    if char_data["avatar"]:
+        embed.set_thumbnail(url=char_data["avatar"])
+    await ctx.send(embed=embed)
 
-            await message.delete()
-            await webhook.send(
-                proxied,
-                username=name,
-                avatar_url=data["avatar"],
-            )
+# ---------- RENAME ----------
+@bot.command(name="rename")
+async def rename(ctx, old_name, new_name):
+    user_id = str(ctx.author.id)
+    if user_id not in characters:
+        await ctx.send("You have no registered characters.")
+        return
+
+    for char in characters[user_id]:
+        if char["name"] == old_name:
+            char["name"] = new_name
+            save_characters()
+            await ctx.send(f"✅ Character `{old_name}` renamed to `{new_name}`")
             return
+    await ctx.send(f"No character named `{old_name}` found.")
 
-    await bot.process_commands(message)
+# ---------- AVATAR ----------
+@bot.command(name="avatar")
+async def avatar(ctx, name):
+    user_id = str(ctx.author.id)
+    if user_id not in characters:
+        await ctx.send("You have no registered characters.")
+        return
 
+    char = next((c for c in characters[user_id] if c["name"] == name), None)
+    if not char:
+        await ctx.send(f"No character named `{name}` found.")
+        return
+
+    if not ctx.message.attachments:
+        await ctx.send("Please attach an image for the avatar.")
+        return
+
+    avatar_url = ctx.message.attachments[0].url
+    char["avatar"] = avatar_url
+    save_characters()
+    await ctx.send(f"✅ Avatar updated for `{name}`!")
+
+# ---------- LIST ----------
+@bot.command(name="list")
+async def list_characters(ctx, *, search: str = None):
+    user_id = str(ctx.author.id)
+    if user_id not in characters or not characters[user_id]:
+        await ctx.send("You have no registered characters.")
+        return
+
+    filtered = characters[user_id]
+    if search:
+        search_lower = search.lower()
+        filtered = [
+            c for c in filtered
+            if search_lower in c["name"].lower()
+            or search_lower in c["bracket"].lower()
+            or search_lower in c.get("universe","").lower()
+        ]
+
+    if not filtered:
+        await ctx.send(f"No characters found for search `{search}`.")
+        return
+
+    embed = discord.Embed(title=f"{ctx.author.name}'s Characters", color=0x00ff00)
+    for char in filtered:
+        value = f"Bracket: {char['bracket']}\nUniverse: {char.get('universe','Default')}"
+        embed.add_field(name=char["name"], value=value, inline=False)
+        if char["avatar"]:
+            embed.set_thumbnail(url=char["avatar"])
+    await ctx.send(embed=embed)
+
+# ---------- DELETE ----------
+@bot.command(name="delete")
+async def delete(ctx, name):
+    user_id = str(ctx.author.id)
+    if user_id not in characters:
+        await ctx.send("You have no registered characters.")
+        return
+
+    for i, char in enumerate(characters[user_id]):
+        if char["name"] == name:
+            del characters[user_id][i]
+            save_characters()
+            await ctx.send(f"✅ Character `{name}` deleted.")
+            return
+    await ctx.send(f"No character named `{name}` found.")
+
+# ---------- ON READY ----------
+@bot.event
+async def on_ready():
+    print(f"{bot.user} is online!")
+
+# ---------- RUN BOT ----------
 bot.run(TOKEN)
