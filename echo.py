@@ -6,26 +6,12 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# ADD THIS
-intents = discord.Intents.default()
-intents.message_content = True  # required for reading messages
-
-bot = commands.Bot(command_prefix="Echo/", intents=intents)
-
-@bot.event
-async def on_ready():
-    print(f"{bot.user} is online!")
-
-bot.run(TOKEN)
-
-
 # Echo: A lightweight proxy bot for RP servers
 # Trigger style: PREFIX ONLY, ending with a colon.
 # Example: Idh: Hello there
 # Registered via: Echo/register "Idhren" Idh:
 
 intents = discord.Intents.default()
-intents.messages = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="Echo/", intents=intents)
@@ -187,4 +173,4 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# bot.run("YOUR_TOKEN_HERE")
+bot.run(TOKEN)
