@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 DATA_FILE = "characters.json"
 
@@ -35,6 +37,7 @@ characters = load_data()
 # ✅ Explicitly enable message content intent
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 # You can also enable other intents if needed (like members, reactions, etc.)
 # intents.members = True
