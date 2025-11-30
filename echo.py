@@ -10,6 +10,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # ---------- BOT SETUP ----------
 intents = discord.Intents.default()
 intents.messages = True
+intents.message_content = True  # Required to read message content
 bot = commands.Bot(command_prefix="Echo/", intents=intents, help_command=None)  # Disable default help
 
 # ---------- PERSISTENT STORAGE ----------
